@@ -133,12 +133,12 @@ def plot_learning_curve(R,order = [],title=''):
 
 class process_data:
 
-    def __init__(self,mouse,sessions,basedir="home"):
+    def __init__(self,mouse,sessions,basedir="home",exp = "2AFC_V2"):
         if basedir == "home":
-            basestr = "/Volumes/mplitt/VR/" + mouse + "/"
+            basestr = "/Volumes/mplitt/VR/" + exp + "/" + mouse + "/"
             #basestr = "/Users/mplitt/Dropbox/tmpVRDat/" +mouse + "/"
         elif basedir == "work":
-            basestr = "Z://VR/" + mouse + "/"
+            basestr = "Z://VR/" + exp + "/" + mouse + "/"
         else:
             raise Exception("Invalid basedir!..options are 'home' or 'work' ")
 
@@ -147,8 +147,8 @@ class process_data:
 
 
         if len(list(sessions)) == 0: # if no sessions are specified, find all of them
-            data_files = glb(basestr + "*LR_licks.txt" )
-            sessions = [(i.split(basestr)[1]).split("_licks.txt")[0] for i in data_files]
+            data_files = glb(basestr + "*_Licks.txt" )
+            sessions = [(i.split(basestr)[1]).split("_Licks.txt")[0] for i in data_files]
         else:
             pass
 
@@ -248,17 +248,17 @@ class process_data:
         '''interpolate all behavioral timeseries to 30 Hz common grid'''
 
         # lick file
-        lickDat = np.genfromtxt(self.basestr + sess + "_licks.txt",dtype='float',delimiter='\t')
+        lickDat = np.genfromtxt(self.basestr + sess + "_Licks.txt",dtype='float',delimiter='\t')
         # c_1  c_2 position.z  r realtimeSinceStartup paramsScript.morph
         punishDat = (lickDat[:,2]==5)*1 # convert r values to int array where airpuffs happened
         speed = self._calc_speed(lickDat[:,2],lickDat[:,4])
 
         # reward file
-        rewardDat = np.genfromtxt(self.basestr + sess + "_rewards.txt",dtype='float',delimiter='\t')
+        rewardDat = np.genfromtxt(self.basestr + sess + "_Rewards.txt",dtype='float',delimiter='\t')
         #position.z realtimeSinceStartup paramsScript.morph side
 
         # manual rewards - looks like this may have not saved correctly in LR sessions
-        mRewardDat = np.genfromtxt(self.basestr + sess + "_MRewards.txt",dtype='float',delimiter='\t')
+        mRewardDat = np.genfromtxt(self.basestr + sess + "ManRewards.txt",dtype='float',delimiter='\t')
         #delta_z realtimeSinceStartup -1.0f  1f
 
         # lick data will have earliest timepoint
