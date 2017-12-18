@@ -6,7 +6,7 @@ import scipy as sp
 import scipy.stats as stats
 from scipy.ndimage.filters import gaussian_filter
 import json
-
+import astropy.convolution as astconv
 
 
 def reward_trig_lick_rate(R, title = '', plots="all"):
@@ -34,7 +34,18 @@ def reward_trig_lick_rate(R, title = '', plots="all"):
             ax_morph[i].legend(('port1 licks','port2 licks'))
             #f_morph[i].show()
 
+def sliding_window_correct(R,window_size = 10):
+    morphOrder = R['morph']
+    lLick,rLick = np.nan(morphOrder.shape), np.nan(morphOrder.shape)
+    lLick[np.where((R['first lick']==1) & (R['morph']== 0))[0]] = 1.
+    rLick[np.where((R['first lick']==2) & (R['morph']== 1))[0]] = 1.
 
+    boxcar = np.ones([window_size,])
+    lLick_smooth = astconv.convolve(lLick.ravel(),boxcar)
+    rLick_smooth = astconv.convolve(rLick.ravel(),boxcar)
+
+
+    return lLick_smooth, rLick_smooth
 
 def psychometrics(R,title='',plots = 'all'):
     '''plot probability that first lick is port2 given morph value excluding omissions.
@@ -122,7 +133,9 @@ def psychometrics(R,title='',plots = 'all'):
     return np.array(morphVals), pport2, (lRT, rRT), omissions
 
 
-def plot_learning_curve(R,order = [],title=''):
+
+
+def plot_learning_curve(R,order = [],title='',toPlot = True):
     '''plot percent correct for each context.
     assuming for now that its only morphs 0 and 1'''
 
@@ -141,17 +154,17 @@ def plot_learning_curve(R,order = [],title=''):
 
     # for each morph
     PR = np.array(PR)
-    #print(PR)
-    #print(PR.shape)
-    f,ax = plt.subplots()
-    ax.plot(PR[:,0],'k',PR[:,1],'r')
-    plt.legend(['context 1','context 2'])
-    ax.set_ylabel('P(lick port2)')
-    ax.set_xlabel('session')
-    ax.set_title(title)
+    if toPlot:
+        f,ax = plt.subplots()
+        ax.plot(PR[:,0],'k',PR[:,1],'r')
+        plt.legend(['context 1','context 2'])
+        ax.set_ylabel('P(lick port2)')
+        ax.set_xlabel('session')
+        ax.set_title(title)
 
-    return f, ax
-
+        return PR, f, ax
+    else:
+        return PR
 
 
 
