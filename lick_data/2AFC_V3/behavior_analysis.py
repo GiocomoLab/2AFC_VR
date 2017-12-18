@@ -43,7 +43,7 @@ def psychometrics(R,title='',plots = 'all'):
     morphVals = np.unique(R['morph']).tolist()
     pport2 = []
     omissions = []
-    lRT, rRT = [], []
+    lRT, rRT= [], []
 
     if 0 not in morphVals:
         morphVals = [0]+morphVals
@@ -57,9 +57,17 @@ def psychometrics(R,title='',plots = 'all'):
         lLick = np.where((R['morph']==morphVals[i]) & (R['first lick'] == 1))[0]
         rLick = np.where((R['morph'] == morphVals[i]) & (R['first lick']==2))[0]
 
+        if lLick.size>0:
+            lRT.append(np.array(R['RT'][lLick]))
 
-        lRT.append(np.array(R['RT'][lLick]))
-        rRT.append(np.array(R['RT'][rLick]))
+        else:
+            lRT.append(np.array([np.nan]))
+
+        if rLick.size>0:
+            rRT.append(np.array(R['RT'][rLick]))
+        else:
+            rRT.append(np.array([np.nan]))
+
 
 
         if lLick.size+rLick.size>0:
@@ -87,13 +95,29 @@ def psychometrics(R,title='',plots = 'all'):
         ax_o.set_title(title+' percent omissions')
         ax_o.set_ylim([0, 1])
 
-    rRT_mu = [rRT[i].mean() for i in range(len(rRT))]
-    lRT_mu = [lRT[i].mean() for i in range(len(lRT))]
+    rRT_mu = [np.nanmean(rRT[i]) for i in range(len(rRT))]
+    lRT_mu = [np.nanmean(lRT[i]) for i in range(len(lRT))]
+    combRT_mu = []
+    for i in range(len(lRT)):
+
+        if np.isnan(lRT_mu[i]) and not np.isnan(rRT_mu[i]):
+            combRT_mu.append(rRT_mu[i])
+        elif np.isnan(rRT_mu[i]) and not np.isnan(lRT_mu[i]):
+            combRT_mu.append(lRT_mu[i])
+        elif np.isnan(lRT_mu[i]) and np.isnan(rRT_mu[i]):
+            combRT_mu.append(np.nan)
+        else:
+            combRT_mu.append(
+            (lRT_mu[i]*lRT[i].size + rRT_mu[i]*rRT[i].size)/(lRT[i].size +
+            rRT[i].size))
+
+    #combRT_mu = [(lRT[i].sum() + rRT[i].sum())/(lRT[i].size+rRT[i].size) for i in range(len(lRT))]
+
     if ('RT' in plots) or plots == 'all':
         f_rt, ax_rt = plt.subplots()
-        ax_rt.plot(morphVals,lRT_mu,'k',morphVals,rRT_mu,'r')
+        ax_rt.plot(morphVals,combRT_mu, 'b', morphVals,lRT_mu,'k',morphVals,rRT_mu,'r')
         ax_rt.set_title(title+' reaction time')
-        ax_rt.legend(('port1 licks','port2 licks'))
+        ax_rt.legend(('combined','left licks','right licks'))
 
     return np.array(morphVals), pport2, (lRT, rRT), omissions
 
@@ -104,9 +128,9 @@ def plot_learning_curve(R,order = [],title=''):
 
     # sort sessions
     if order == []:
-        sessList = sorted([int(i.split('_')[0]) for i in R.keys()])
-        order = [str(i)+'_LR' for i in sessList]
-
+        #sessList = sorted([int(i.split('_')[0]) for i in R.keys()])
+        #order = [str(i)+'_LR' for i in sessList]
+        order = R.keys()
     # get p(lick port2| morph) for each session
     MV,PR= [],[]
     for s in order:
@@ -126,6 +150,7 @@ def plot_learning_curve(R,order = [],title=''):
     ax.set_xlabel('session')
     ax.set_title(title)
 
+    return f, ax
 
 
 
@@ -152,7 +177,7 @@ class process_data:
         if len(list(sessions)) == 0: # if no sessions are specified, find all of them
 
             data_files = glb(basestr + scene + "*_Licks.txt" )
-            
+
 
             sessions = [(i.split(basestr)[1]).split("_Licks.txt")[0] for i in data_files]
 
@@ -216,13 +241,13 @@ class process_data:
 
         Dall, Rall = {}, {}
 
-        for key in Rall.keys():
+        for key in self.rewardTrig[sessions[0]].keys():
             if key == 'time':
                 Rall[key] = self.rewardTrig[sessions[0]][key]
             else:
                 Rall[key] = np.concatenate(tuple([self.rewardTrig[sess][key] for sess in sessions]),axis = 0)
 
-        for key in Dall.keys():
+        for key in self.gridData[sessions[0]].keys():
             Dall[key] = np.concatenate(tuple([self.gridData[sess][key] for sess in sessions]))
 
         return Rall, Dall
@@ -273,6 +298,7 @@ class process_data:
 
         # reward file
         rewardDat = np.genfromtxt(self.basestr + sess + "_Rewards.txt",dtype='float',delimiter='\t')
+        #print(rewardDat.shape)
         #position.z realtimeSinceStartup paramsScript.morph side
 
         # manual rewards - looks like this may have not saved correctly in LR sessions
@@ -318,13 +344,24 @@ class process_data:
                 mRewardInd = np.array([])
             ## build indices of lickDat
 
-            if lickInd.size>0:
+            if posInd.size>0:
                 # 1) position
                 gridData['position'][i] = posDat[posInd,0].mean()
 
                 # 2) speed, calc outside of loop
                 gridData['speed'][i] = speed[posInd].mean()
 
+                nonNan.append(i)
+            else:
+
+                # 1) position
+                #gridData[i,0] = gridData[i-1,0]
+                gridData['position'][i] = np.nan
+
+                # 2) speed
+                gridData['speed'][i] = np.nan
+
+            if lickInd.size>0:
                 # 3) quinine licks
                 gridData['port1 licks'][i] = lickDat[lickInd,0].sum()
 
@@ -337,15 +374,7 @@ class process_data:
 
 
 
-                nonNan.append(i)
-            else:
 
-                # 1) position
-                #gridData[i,0] = gridData[i-1,0]
-                gridData['position'][i] = np.nan
-
-                # 2) speed
-                gridData['speed'][i] = np.nan
 
             # 5) reward cam flag
             if rewardInd.size>0:
@@ -391,7 +420,7 @@ class process_data:
             # find tgrid indices of new trials
         except:
             # find teleports and append a trial start
-            trialStart = np.where(np.ediff1d(gridData['position'],to_begin = -900, to_end = -900)<=-400)[0]
+            trialStart = np.where(np.ediff1d(gridData['position'],to_begin = -900, to_end = -900)<=-300)[0]
 
 
         #trialLists = [[] for i in range(trialStart.size)]
@@ -502,8 +531,15 @@ class process_data:
 
     def _calc_speed(self,pos,t, toSmooth = True ):
         '''calculate speed from position and time vectors'''
-        rawSpeed = np.divide(np.ediff1d(pos,to_end=0),np.ediff1d(t,to_end=1))
-        notTeleports = np.where(rawSpeed>-50)[0]
+        dt = np.ediff1d(t,to_end=1)
+        dt[dt==0.] = np.nan
+        rawSpeed = np.divide(np.ediff1d(pos,to_end=0),dt)
+        #nanInds = np.where(np.isnan(rawSpeed))
+        #for i in nanInds.size:
+        #    if i == 0:
+
+
+        notTeleports = np.where(np.ediff1d(pos,to_begin=0)>-50)[0]
 
         #rawSpeed[teleports] = np.nan
         inds = [i for i in range(rawSpeed.size)]
